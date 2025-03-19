@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>天氣資訊</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* 復古風背景與字型設定 */
+    body {
+      margin: 0;
+      background-color: #fdf6e3;  /* 復古紙張色 */
+      font-family: 'Georgia', serif;
+      color: #5c4033;  /* 深棕色文字 */
+    }
+    /* 導覽列固定在頂端，並可隱藏顯示 */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 999;
+      background-color: #5c4033;
+      transition: top 0.3s; /* 滑動隱藏/顯示 */
+    }
+    .navbar .navbar-brand {
+      color: #fdf6e3;
+      font-weight: bold;
+    }
+    .form-check-input {
+      background-color: #fdf6e3;
+      border: 1px solid #fdf6e3;
+    }
+    .form-check-label {
+      color: #fdf6e3;
+    }
+    /* 主要內容區與導覽列分開，避免被蓋住 */
+    .content-wrapper {
+      margin-top: 80px; /* 預留空間給導覽列 */
+      padding: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 導覽列 -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">天氣資訊</a>
+      <a class="navbar-brand" href="{{ url_for('taiwan_map') }}">台灣地圖</a>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="locationSwitch" checked>
+        <label class="form-check-label" for="locationSwitch" id="locationLabel">位置服務: ON</label>
+      </div>
+    </div>
+    
+  </nav>
+  
+  <!-- 內容區，由各模板填入 -->
+  <div class="content-wrapper">
+    {% block content %}
+    {% endblock %}
+  </div>
+  
+  <!-- Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    /* 
+      (1) 當使用者往下捲動時，隱藏導覽列；往上捲動時顯示導覽列。
+      (2) 在 .navbar 設定 transition: top 0.3s 以呈現平滑效果。
+    */
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function(){
+      let st = window.pageYOffset || document.documentElement.scrollTop;
+      if (st > lastScrollTop) {
+        // 往下捲動 => 隱藏導覽列
+        document.querySelector('.navbar').style.top = '-70px';
+      } else {
+        // 往上捲動 => 顯示導覽列
+        document.querySelector('.navbar').style.top = '0';
+      }
+      lastScrollTop = st <= 0 ? 0 : st;
+    }, false);
+
+    // 切換按鈕文字變更 + 關閉時清除位置資訊
+    const locationSwitch = document.getElementById('locationSwitch');
+    const locationLabel = document.getElementById('locationLabel');
+    locationSwitch.addEventListener('change', function() {
+      if (this.checked) {
+        locationLabel.textContent = '位置服務: ON';
+      } else {
+        locationLabel.textContent = '位置服務: OFF';
+        // 關閉時，清除位置資訊 & 回復預設區塊
+        const userLocation = document.getElementById('userLocation');
+        if (userLocation) userLocation.textContent = '';
+        const realtimeWeather = document.getElementById('realtimeWeather');
+        if (realtimeWeather) realtimeWeather.innerHTML = '';
+        const defaultRealtime = document.getElementById('defaultRealtime');
+        if (defaultRealtime) defaultRealtime.style.display = 'block';
+        
+        // 也可一併重置一周預報下拉選單 & 折線圖
+        const districtSelector = document.getElementById('districtSelector');
+        if (districtSelector) districtSelector.value = "";
+        const forecastCards = document.getElementById('forecastCards');
+        if (forecastCards) forecastCards.style.display = "none";
+        const chartContainer = document.getElementById('chartContainer');
+        if (chartContainer) chartContainer.style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>
