@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg py-3">
+  <h1 class="text-center mb-4">高雄市天氣</h1>
+  
+  <!-- 取得使用者位置區塊 -->
+  <div class="mb-4 text-center">
+    <button id="geolocation" class="btn btn-primary">取得我的位置</button>
+    <p id="userLocation" class="mt-2"></p>
+  </div>
+  
+  <!-- 預設即時觀測資料 (預設大社區) -->
+  <div id="defaultRealtime">
+    <h2 class="mb-4">即時觀測資料 (預設大社區)</h2>
+    {% if weather_data %}
+      {% for data in weather_data %}
+        {% set weather_icon = 'bi-cloud-sun' %}
+        {% if '晴' in data.weather_status %}
+          {% set weather_icon = 'bi-sun' %}
+        {% elif '雨' in data.weather_status %}
+          {% set weather_icon = 'bi-cloud-rain' %}
+        {% elif '陰' in data.weather_status %}
+          {% set weather_icon = 'bi-cloudy' %}
+        {% endif %}
+        <div class="card mb-3" style="box-shadow: 0 2px 6px rgba(0,0,0,0.1); font-family: 'DFKai-SB', '標楷體', serif;">
+          <div class="row g-0">
+            <div class="col-md-4 d-flex flex-column justify-content-center align-items-center p-4"
+                 style="background: linear-gradient(135deg, #c2a98d 0%, #e6ceac 100%); color: #5c4033;">
+              <i class="bi {{ weather_icon }} fs-2 mb-2"></i>
+              <p class="temp-number mb-1" style="font-size: 2rem; font-weight: 700;">{{ data.temperature }} °C</p>
+              <small class="temp-label">氣溫</small>
+            </div>
+            <div class="col-md-8">
+              <div class="card-body">
+                <h4 class="card-title mb-2">{{ data.station }}</h4>
+                <p><strong>觀測時間：</strong>{{ data.time }}</p>
+                <p><strong>天氣狀況：</strong>{{ data.weather_status }}</p>
+                <p><strong>降雨機率：</strong> {{ data.rain_prob }}%</p>
+                <div class="progress mb-2" style="height: 20px;">
+                  <div class="progress-bar bg-warning" role="progressbar" 
+                       style="width: {{ data.rain_prob }}%;" 
+                       aria-valuenow="{{ data.rain_prob }}" aria-valuemin="0" aria-valuemax="100">
+                  </div>
+                </div>
+                <p><strong>體感溫度：</strong>{{ data.apparent_temperature }} °C</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-center">目前沒有即時觀測資料。</p>
+    {% endif %}
+  </div>
+  
+  <!-- 使用者位置顯示、由 geolocation 取得資料後覆蓋 -->
+  <div id="realtimeWeather"></div>
+  
+  <!-- 一周天氣預報 -->
+  <h2 class="mt-5 mb-3">一周天氣預報</h2>
+  <div class="mb-4">
+    <label for="districtSelector" class="form-label">選擇地區</label>
+    <select id="districtSelector" class="form-select">
+      <option value="" selected>請選擇區域</option>
+      {% for d in districts %}
+        <option value="{{ d }}">{{ d }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="row row-cols-1 row-cols-md-3 g-4" id="forecastCards" style="display: none;">
+    {% if forecast %}
+      {% for day in forecast %}
+        <div class="col forecast-card-wrapper" data-district="{{ day.district.strip() }}">
+          <div class="card h-100" style="box-shadow: 0 2px 6px rgba(0,0,0,0.1); font-family: 'DFKai-SB', '標楷體', serif;">
+            <div class="text-center fs-5 p-2" 
+                 style="background-color: #c2a98d; color: #5c4033;">
+              {{ day.date }}<br>
+              <small>{{ day.district }}</small>
+            </div>
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-center mb-3" style="gap: 0.5rem;">
+                {% set weather_icon = 'bi-cloud-sun' %}
+                {% if '晴' in day.weather %}
+                  {% set weather_icon = 'bi-sun' %}
+                {% elif '雨' in day.weather %}
+                  {% set weather_icon = 'bi-cloud-rain' %}
+                {% elif '陰' in day.weather %}
+                  {% set weather_icon = 'bi-cloudy' %}
+                {% endif %}
+                <i class="bi {{ weather_icon }} fs-2"></i>
+                <span>{{ day.weather }}</span>
+              </div>
+              <p class="mb-1"><strong>最高溫：</strong>{{ day.max_temp }} °C</p>
+              <p class="mb-1"><strong>最低溫：</strong>{{ day.min_temp }} °C</p>
+              <p class="mb-1"><strong>降雨機率：</strong></p>
+              <div class="progress mb-3" style="height: 20px;">
+                <div class="progress-bar bg-warning" role="progressbar" 
+                     style="width: {{ day.rain_prob }}%;" 
+                     aria-valuenow="{{ day.rain_prob }}" aria-valuemin="0" aria-valuemax="100">
+                  {{ day.rain_prob }}%
+                </div>
+              </div>
+              <p class="mb-0"><strong>體感：</strong>
+                <span style="font-weight:700;"
+                      class="{% if day.comfort == '寒冷' %}text-primary{% elif day.comfort == '略有寒意' %}text-info{% else %}text-success{% endif %}">
+                  {{ day.comfort }}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+  
+  <!-- 一周天氣預報折線圖 -->
+  <div id="chartContainer" style="display: none;">
+    <h2 class="mt-5 mb-3">一周天氣預報折線圖</h2>
+    <canvas id="weatherChart"></canvas>
+  </div>
+</div>
+
+<!-- 將後端傳入的 forecast 資料存入前端變數 -->
+<script>
+  var forecastData = {{ forecast|tojson }};
+</script>
+
+<!-- 讀取使用者位置並更新即時觀測資料 -->
+<script>
+  function reverseGeocode(lat, lon) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`)
+      .then(response => response.json())
+      .then(data => {
+        let district = "";
+        if (data.address) {
+          if (data.address.city_district) {
+            district = data.address.city_district;
+          } else if (data.address.suburb) {
+            district = data.address.suburb;
+          } else {
+            let match = data.display_name.match(/([^,]+區)/);
+            if (match) {
+              district = match[1];
+            }
+          }
+        }
+        const userLocation = document.getElementById('userLocation');
+        userLocation.textContent = `您位於: ${data.display_name} (緯度: ${lat}, 經度: ${lon})`;
+        
+        if (district) {
+          fetch(`/realtime?district=${encodeURIComponent(district)}&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(weatherData => {
+              let html = `<h4 class="mt-3" style="font-family: 'DFKai-SB', '標楷體', serif;">即時觀測資料 - ${district}</h4>`;
+              if (weatherData.length > 0) {
+                weatherData.forEach(item => {
+                  html += `
+                    <div class="card mb-3" style="box-shadow: 0 2px 6px rgba(0,0,0,0.1); font-family: 'DFKai-SB', '標楷體', serif;">
+                      <div class="row g-0">
+                        <div class="col-md-4 d-flex flex-column justify-content-center align-items-center p-4"
+                             style="background: linear-gradient(135deg, #c2a98d 0%, #e6ceac 100%); color: #5c4033;">
+                          <i class="bi bi-cloud-sun fs-2 mb-2"></i>
+                          <p class="temp-number mb-1" style="font-size: 2rem; font-weight: 700;">${item.temperature} °C</p>
+                          <small class="temp-label">氣溫</small>
+                        </div>
+                        <div class="col-md-8">
+                          <div class="card-body">
+                            <h4 class="card-title mb-2">${item.station}</h4>
+                            <p><strong>觀測時間：</strong>${item.time}</p>
+                            <p><strong>天氣狀況：</strong>${item.weather_status}</p>
+                            <p><strong>降雨機率：</strong>${item.rain_prob}%</p>
+                            <div class="progress mb-2" style="height: 20px;">
+                              <div class="progress-bar bg-warning" role="progressbar"
+                                   style="width: ${item.rain_prob}%;"
+                                   aria-valuenow="${item.rain_prob}" aria-valuemin="0" aria-valuemax="100">
+                              </div>
+                            </div>
+                            <p><strong>體感溫度：</strong>${item.apparent_temperature} °C</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                });
+              } else {
+                html = `<h4 class="mt-3" style="font-family: 'DFKai-SB', '標楷體', serif;">即時觀測資料 - ${district}</h4>
+                        <p>目前查無 ${district} 的即時觀測資料。</p>`;
+              }
+              document.getElementById('defaultRealtime').style.display = 'none';
+              document.getElementById('realtimeWeather').innerHTML = html;
+            });
+        } else {
+          document.getElementById('realtimeWeather').innerHTML = `<p>無法解析您的區域資訊。</p>`;
+        }
+      })
+      .catch(error => {
+        const userLocation = document.getElementById('userLocation');
+        userLocation.textContent = `取得位置資訊失敗: ${error}`;
+      });
+  }
+
+  const geolocationBtn = document.getElementById('geolocation');
+  const locationSwitch = document.getElementById('locationSwitch');
+  const locationLabel = document.getElementById('locationLabel');
+  geolocationBtn.addEventListener('click', function () {
+    // 點擊「取得我的位置」時自動開啟位置服務
+    locationSwitch.checked = true;
+    locationLabel.textContent = '位置服務: ON';
+
+    if ("geolocation" in navigator) {
+      function successCallback(position) {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        reverseGeocode(latitude, longitude);
+      }
+      function errorCallback(error) {
+        document.getElementById('userLocation').textContent = `錯誤：${error.message}`;
+      }
+      const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
+      navigator.geolocation.getCurrentPosition(successCallback, errorCallback, options);
+    } else {
+      document.getElementById('userLocation').textContent = "瀏覽器不支援 Geolocation";
+    }
+  });
+</script>
+
+<!-- 載入 Chart.js 並設定一周折線圖 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+/* 
+  STEP 1: 將原始天氣描述簡化為「晴天 / 陰天 / 可能下雨 / 陰天、可能下雨 / 未知」
+  - 若描述同時包含「陰 / 雲」與「雨」，則顯示「陰天、可能下雨」
+  - 若包含「晴」就直接顯示「晴天」
+  - 其餘依關鍵字略作區分
+*/
+function simplifyWeatherDesc(desc) {
+  desc = desc || "";
+  // 1) 若含「晴」 => 直接判定為「晴天」
+  if (desc.includes("晴")) {
+    return "晴天";
+  }
+  // 2) 若含「雨」 => 再判斷是否也含「陰」或「雲」
+  if (desc.includes("雨")) {
+    if (desc.includes("陰") || desc.includes("雲")) {
+      return "陰天、可能下雨";
+    }
+    return "可能下雨";
+  }
+  // 3) 若含「陰」或「雲」 => 「陰天」
+  if (desc.includes("陰") || desc.includes("雲")) {
+    return "陰天";
+  }
+  // 4) 否則 => 「未知」
+  return "未知";
+}
+
+/* 
+  STEP 2: 根據簡化後的描述，返回對應的 Emoji
+*/
+function getWeatherEmoji(simplifiedDesc) {
+  switch (simplifiedDesc) {
+    case "晴天":
+      return '☀';
+    case "陰天":
+      return '☁';
+    case "可能下雨":
+    case "陰天、可能下雨":
+      return '🌧';
+    default:
+      return '🌤'; // 預設
+  }
+}
+
+const districtSelector = document.getElementById("districtSelector");
+const forecastCardsContainer = document.getElementById("forecastCards");
+const chartContainer = document.getElementById("chartContainer");
+
+districtSelector.addEventListener("change", function(){
+  var selected = this.value.trim();
+  var cards = document.getElementsByClassName("forecast-card-wrapper");
+  var anyVisible = false;
+  if(selected === ""){
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].style.display = "none";
+    }
+    chartContainer.style.display = "none";
+  } else {
+    for (var i = 0; i < cards.length; i++) {
+      var cardDistrict = cards[i].getAttribute("data-district").trim();
+      if(cardDistrict === selected) {
+        cards[i].style.display = "block";
+        anyVisible = true;
+      } else {
+        cards[i].style.display = "none";
+      }
+    }
+    forecastCardsContainer.style.display = anyVisible ? "flex" : "none";
+    chartContainer.style.display = anyVisible ? "block" : "none";
+    updateChart(selected);
+  }
+});
+
+// 初始化 Chart.js 折線圖 (最高溫與最低溫)
+var ctx = document.getElementById('weatherChart').getContext('2d');
+var weatherChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: '最高溫',
+      data: [],
+      borderColor: 'rgba(205, 92, 92, 1)',     // 印第安紅
+      backgroundColor: 'rgba(205, 92, 92, 0.2)',
+      fill: false,
+      tension: 0.1
+    },
+    {
+      label: '最低溫',
+      data: [],
+      borderColor: 'rgba(72, 61, 139, 1)',     // 深紫藍
+      backgroundColor: 'rgba(72, 61, 139, 0.2)',
+      fill: false,
+      tension: 0.1
+    }]
+  },
+  options: {
+    responsive: true,
+    // 滑鼠在圖表上移動時，自動找最近的點顯示 tooltip
+    interaction: {
+      mode: 'nearest',
+      intersect: false
+    },
+    plugins: {
+      tooltip: {
+        // 調整 Tooltip 外觀：背景、字型大小、間距等
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        cornerRadius: 10,
+        padding: 12,
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        titleFont: { size: 18 },
+        bodyFont: { size: 16 },
+        displayColors: false,
+        callbacks: {
+          label: function(context) {
+            let index = context.dataIndex;
+            // 取出該點對應的預報資料
+            let data = window.currentForecastData && window.currentForecastData[index];
+            let label = context.dataset.label || '';
+            let value = context.parsed.y;
+            if (!data) {
+              return `${label}: ${value}°C`;
+            }
+            // 進行天氣描述簡化
+            let simpleDesc = simplifyWeatherDesc(data.weather);
+            let weatherIcon = getWeatherEmoji(simpleDesc);
+            // 顯示「最高(或最低)溫度 + 簡化天氣 + 降雨機率 + 體感」
+            return `${label}: ${value}°C | ${weatherIcon} ${simpleDesc}, 降雨: ${data.rain_prob}%, 體感: ${data.comfort}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { 
+        title: { display: true, text: '日期' }
+      },
+      y: { 
+        title: { display: true, text: '溫度 (°C)' }
+      }
+    }
+  }
+});
+
+/* 
+  STEP 3: 更新圖表資料
+  - 從 forecastData 過濾出使用者選擇的區域，存入全域變數 currentForecastData
+  - 更新折線圖
+*/
+function updateChart(selectedDistrict) {
+  var filtered = forecastData.filter(function(entry){
+    return entry.district.trim() === selectedDistrict;
+  });
+  // 存入全域變數，tooltip 可直接拿來用
+  window.currentForecastData = filtered;
+
+  var labels = filtered.map(function(entry){ return entry.date; });
+  var maxTemps = filtered.map(function(entry){ return entry.max_temp; });
+  var minTemps = filtered.map(function(entry){ return entry.min_temp; });
+  
+  weatherChart.data.labels = labels;
+  weatherChart.data.datasets[0].data = maxTemps;
+  weatherChart.data.datasets[1].data = minTemps;
+  weatherChart.update();
+}
+</script>
+
+
+{% endblock %}

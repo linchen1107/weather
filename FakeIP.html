@@ -1,0 +1,39 @@
+<!-- <script>
+if ("geolocation" in navigator) {
+  // 自訂位置資訊
+  const fakePosition = {
+    coords: {
+      latitude: 25.0330,   // 緯度
+      longitude: 121.5654, // 經度
+      accuracy: 100,       // 精確度（單位：公尺）
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null
+    },
+    timestamp: Date.now()
+  };
+
+  // 保存原始方法（若需要時可還原）
+  const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
+  const originalWatchPosition = navigator.geolocation.watchPosition;
+
+  // 覆寫 getCurrentPosition
+  navigator.geolocation.getCurrentPosition = function(success, error, options) {
+    success(fakePosition);
+  };
+
+  // 覆寫 watchPosition
+  navigator.geolocation.watchPosition = function(success, error, options) {
+    // 每秒更新一次
+    const id = setInterval(() => {
+      success(fakePosition);
+    }, 1000);
+    return id;
+  };
+
+  console.log("定位資訊已被修改！");
+} else {
+  console.log("瀏覽器不支援地理定位");
+}
+</script> -->
